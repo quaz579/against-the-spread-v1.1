@@ -16,6 +16,7 @@ export class PicksPage {
   // Game selection elements
   readonly backButton: Locator;
   readonly downloadButton: Locator;
+  readonly generatedDownloadButton: Locator;
   readonly printButton: Locator;
 
   // Status elements
@@ -35,6 +36,7 @@ export class PicksPage {
     // Game selection elements
     this.backButton = page.getByRole('button', { name: /← Back to Week Selection/ });
     this.downloadButton = page.getByRole('button', { name: /Generate Your Picks/ });
+    this.generatedDownloadButton = page.getByRole('button', { name: /Download File/ });
     this.printButton = page.getByRole('button', { name: /Print My Picks/ });
 
     // Status elements
@@ -258,6 +260,8 @@ export class PicksPage {
    */
   async clickDownload(): Promise<void> {
     await this.downloadButton.click();
+    await this.generatedDownloadButton.waitFor({ state: 'visible' });
+    await this.generatedDownloadButton.click();
   }
 
   /**

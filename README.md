@@ -1,4 +1,4 @@
-# Against The Spread - College Football Pick'em PWA
+# Against The Spread v1.1 - College Football Pick'em PWA
 
 [![Build and Test](https://github.com/YOUR_USERNAME/against-the-spread/actions/workflows/build-test.yml/badge.svg)](https://github.com/YOUR_USERNAME/against-the-spread/actions/workflows/build-test.yml)
 [![codecov](https://codecov.io/gh/YOUR_USERNAME/against-the-spread/branch/main/graph/badge.svg)](https://codecov.io/gh/YOUR_USERNAME/against-the-spread)
@@ -77,8 +77,8 @@ If you prefer to install tools manually:
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/quaz579/against-the-spread.git
-   cd against-the-spread
+   git clone https://github.com/quaz579/against-the-spread-v1.1.git
+   cd against-the-spread-v1.1
    ```
 
 2. **Create .env file** (for local development)

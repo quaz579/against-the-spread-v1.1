@@ -1,6 +1,13 @@
 terraform {
   required_version = ">= 1.0"
 
+  backend "azurerm" {
+    resource_group_name  = "ats-v11-prod-rg"
+    storage_account_name = "atsv11prodst"
+    container_name       = "tfstate"
+    key                  = "against-the-spread-v1.1.tfstate"
+  }
+
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
@@ -51,21 +58,14 @@ resource "azurerm_resource_group" "main" {
 
 # Storage Account for game files and function storage
 resource "azurerm_storage_account" "main" {
-  name                     = replace("${local.resource_prefix}st", "-", "")
-  resource_group_name      = azurerm_resource_group.main.name
-  location                 = azurerm_resource_group.main.location
-  account_tier             = "Standard"
-  account_replication_type = "LRS"
-
-  blob_properties {
-    cors_rule {
-      allowed_headers    = ["*"]
-      allowed_methods    = ["GET", "HEAD", "POST", "PUT"]
-      allowed_origins    = ["*"]
-      exposed_headers    = ["*"]
-      max_age_in_seconds = 3600
-    }
-  }
+  name                            = replace("${local.resource_prefix}st", "-", "")
+  resource_group_name             = azurerm_resource_group.main.name
+  location                        = azurerm_resource_group.main.location
+  account_tier                    = "Standard"
+  account_replication_type        = "LRS"
+  min_tls_version                 = "TLS1_2"
+  https_traffic_only_enabled      = true
+  allow_nested_items_to_be_public = false
 
   tags = local.tags
 }
@@ -77,6 +77,13 @@ resource "azurerm_storage_container" "gamefiles" {
   container_access_type = "private"
 }
 
+# Container for durable Terraform state
+resource "azurerm_storage_container" "tfstate" {
+  name                  = "tfstate"
+  storage_account_name  = azurerm_storage_account.main.name
+  container_access_type = "private"
+}
+
 # Application Insights for monitoring
 resource "azurerm_application_insights" "main" {
   name                = "${local.resource_prefix}-ai"
@@ -84,6 +91,11 @@ resource "azurerm_application_insights" "main" {
   resource_group_name = azurerm_resource_group.main.name
   application_type    = "web"
   tags                = local.tags
+
+  # Azure may attach a managed Log Analytics workspace automatically.
+  lifecycle {
+    ignore_changes = [workspace_id]
+  }
 }
 
 # App Service Plan for Azure Functions
@@ -103,25 +115,36 @@ resource "azurerm_linux_function_app" "main" {
   resource_group_name = azurerm_resource_group.main.name
   service_plan_id     = azurerm_service_plan.main.id
 
-  storage_account_name       = azurerm_storage_account.main.name
-  storage_account_access_key = azurerm_storage_account.main.primary_access_key
+  storage_account_name                           = azurerm_storage_account.main.name
+  storage_account_access_key                     = azurerm_storage_account.main.primary_access_key
+  https_only                                     = true
+  ftp_publish_basic_authentication_enabled       = false
+  webdeploy_publish_basic_authentication_enabled = false
 
   site_config {
+    application_insights_connection_string = azurerm_application_insights.main.connection_string
+    application_insights_key               = azurerm_application_insights.main.instrumentation_key
+
     application_stack {
       dotnet_version              = "8.0"
       use_dotnet_isolated_runtime = true
     }
 
     cors {
-      allowed_origins = ["*"] # Update in production with specific origins
+      allowed_origins = ["https://${azurerm_static_web_app.main.default_host_name}"]
     }
   }
 
   app_settings = {
-    "FUNCTIONS_WORKER_RUNTIME"       = "dotnet-isolated"
-    "APPINSIGHTS_INSTRUMENTATIONKEY" = azurerm_application_insights.main.instrumentation_key
-    "AzureWebJobsStorage"            = azurerm_storage_account.main.primary_connection_string
-    "WEBSITE_RUN_FROM_PACKAGE"       = "1"
+    "FUNCTIONS_WORKER_RUNTIME" = "dotnet-isolated"
+    "AzureWebJobsStorage"      = azurerm_storage_account.main.primary_connection_string
+    "WEBSITE_RUN_FROM_PACKAGE" = "1"
+  }
+
+  # Azure masks this platform-managed connection string on read, which would
+  # otherwise produce a perpetual no-op diff after every successful apply.
+  lifecycle {
+    ignore_changes = [app_settings["AzureWebJobsStorage"]]
   }
 
   tags = local.tags
@@ -130,7 +153,7 @@ resource "azurerm_linux_function_app" "main" {
 # Static Web App for Blazor
 resource "azurerm_static_web_app" "main" {
   name                = "${local.resource_prefix}-web"
-  location            = "eastus2" # Static Web Apps have limited regions
+  location            = var.location
   resource_group_name = azurerm_resource_group.main.name
   sku_tier            = "Free"
   sku_size            = "Free"
@@ -166,7 +189,13 @@ output "function_app_url" {
 
 output "static_web_app_url" {
   value       = "https://${azurerm_static_web_app.main.default_host_name}"
-  description = "Static web app URL"
+  description = "Static Web App URL"
+}
+
+output "application_insights_connection_string" {
+  value       = azurerm_application_insights.main.connection_string
+  description = "Application Insights connection string"
+  sensitive   = true
 }
 
 output "static_web_app_deployment_token" {

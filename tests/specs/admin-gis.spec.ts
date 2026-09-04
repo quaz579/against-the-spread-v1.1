@@ -27,7 +27,7 @@ test('GIS credential stays in memory and authorizes only the admin API', async (
     };
   });
 
-  await page.route('**/api/admin/me', async route => {
+  await page.route('**/api/current-admin', async route => {
     observedAuthorization = route.request().headers()['authorization'];
     await route.fulfill({
       status: 200,

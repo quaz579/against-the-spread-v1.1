@@ -37,7 +37,7 @@ public class ApiServiceAuthorizationTests
             r.AuthorizationParameter == "google-id-token" &&
             r.NoStore);
         handler.Requests.Select(r => r.Path).Should().Equal(
-            "/api/admin/me",
+            "/api/current-admin",
             "/api/upload-lines?week=1&year=2026",
             "/api/upload-bowl-lines?year=2026");
         client.DefaultRequestHeaders.Authorization.Should().BeNull();
@@ -80,7 +80,7 @@ public class ApiServiceAuthorizationTests
                 request.Headers.CacheControl?.NoStore == true));
 
             var path = request.RequestUri.PathAndQuery;
-            if (path == "/api/admin/me")
+            if (path == "/api/current-admin")
             {
                 return Task.FromResult(JsonResponse(new { email = "admin@example.com" }));
             }

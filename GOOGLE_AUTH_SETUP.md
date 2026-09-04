@@ -34,7 +34,8 @@ Apply settings through `infrastructure/terraform/main.tf`; do not configure SWA 
 - Missing, malformed, expired, wrongly signed, or wrong-audience credentials return `401`.
 - Tokens without a verified, non-empty email return `401`.
 - A valid Google identity not present in `ADMIN_EMAILS` returns `403`.
-- `/api/admin/me`, `/api/upload-lines`, and `/api/upload-bowl-lines` require the bearer token.
+- `/api/current-admin`, `/api/upload-lines`, and `/api/upload-bowl-lines` require the bearer token.
+- The identity route avoids Azure Functions' reserved `/api/admin*` prefix.
 - Public picks and lines APIs remain anonymous.
 - `X-MS-CLIENT-PRINCIPAL` is not trusted.
 

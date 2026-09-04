@@ -202,7 +202,7 @@ public class ApiService
 
     public async Task<AdminMeResult> GetAdminIdentityAsync(string idToken)
     {
-        using var request = CreateProtectedRequest(HttpMethod.Get, "api/admin/me", idToken);
+        using var request = CreateProtectedRequest(HttpMethod.Get, "api/current-admin", idToken);
         using var response = await _httpClient.SendAsync(request);
 
         if (!response.IsSuccessStatusCode)

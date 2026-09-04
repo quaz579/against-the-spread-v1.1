@@ -76,7 +76,7 @@ public class AdminAuthenticationTests : TestContext
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
-            if (request.RequestUri!.AbsolutePath == "/api/admin/me")
+            if (request.RequestUri!.AbsolutePath == "/api/current-admin")
             {
                 var response = new HttpResponseMessage(_meStatus);
                 if (_meStatus == HttpStatusCode.OK)

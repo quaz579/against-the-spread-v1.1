@@ -130,7 +130,7 @@ The skipped fixture-upload suites follow this flow:
 ## How Authentication Works
 
 The active browser authentication test injects a fake GIS callback before
-Blazor loads and intercepts `/api/admin/me`. It verifies that the credential is
+Blazor loads and intercepts `/api/current-admin`. It verifies that the credential is
 sent only as a Bearer token on the protected API request, is not persisted in
 browser storage, and is cleared on sign-out. Server-side token validation and
 upload authorization are covered by .NET unit tests.

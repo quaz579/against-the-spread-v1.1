@@ -82,6 +82,20 @@ public class AuthenticationConfigurationTests
     }
 
     [Fact]
+    public void AdminIdentityEndpoint_AvoidsFunctionsReservedAdminRoute()
+    {
+        var root = FindRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "AgainstTheSpread.Functions",
+            "AdminMeFunction.cs"));
+
+        source.Should().Contain("Route = \"current-admin\"");
+        source.Should().NotContain("Route = \"admin/");
+    }
+
+    [Fact]
     public void PlaywrightAdminHelper_DoesNotLogAuthHeadersOrUseSwaMockAuth()
     {
         var root = FindRepositoryRoot();

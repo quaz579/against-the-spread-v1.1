@@ -22,7 +22,7 @@ public sealed class AdminMeFunction
 
     [Function("AdminMe")]
     public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "admin/me")] HttpRequestData request,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "current-admin")] HttpRequestData request,
         CancellationToken cancellationToken)
     {
         var authorization = await _authorizationService.AuthorizeAsync(request, cancellationToken);

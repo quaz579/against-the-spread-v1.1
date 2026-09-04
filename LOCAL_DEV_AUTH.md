@@ -8,7 +8,7 @@ No localhost Google origin is required for the normal test suite:
 
 - Function authorization tests inject a fake token validator.
 - Blazor component tests mock JavaScript interop and the same-origin admin API.
-- `tests/specs/admin-gis.spec.ts` injects a fake GIS browser object and intercepts `/api/admin/me`.
+- `tests/specs/admin-gis.spec.ts` injects a fake GIS browser object and intercepts `/api/current-admin`.
 
 The browser test credential is synthetic, never leaves localhost, and cannot authenticate to production.
 

@@ -131,9 +131,10 @@ The skipped fixture-upload suites follow this flow:
 
 The active browser authentication test injects a fake GIS callback before
 Blazor loads and intercepts `/api/current-admin`. It verifies that the credential is
-sent only as a Bearer token on the protected API request, is not persisted in
-browser storage, and is cleared on sign-out. Server-side token validation and
-upload authorization are covered by .NET unit tests.
+sent only in `X-Google-ID-Token` on the protected API request, is not persisted
+in browser storage, and is cleared on sign-out. The standard `Authorization`
+header is deliberately unused because the managed SWA proxy replaces it.
+Server-side token validation and upload authorization are covered by .NET unit tests.
 
 The older fixture-upload flows are skipped because they depended on SWA mock
 principals, which this security boundary deliberately rejects. Re-enable them

@@ -235,7 +235,7 @@ public class ApiService
         }
 
         var request = new HttpRequestMessage(method, requestUri);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", idToken);
+        request.Headers.Add("X-Google-ID-Token", idToken);
         request.Headers.CacheControl = new CacheControlHeaderValue { NoStore = true };
         return request;
     }

@@ -10,8 +10,11 @@ which is not available on the Free plan and is not trusted by the current API.
 2. GIS returns a short-lived Google ID token to the browser callback.
 3. The token remains in component memory; it is never placed in a URL, cookie,
    local storage, or session storage.
-4. The browser sends `Authorization: Bearer <token>` only to `/api/current-admin`,
-   `/api/upload-lines`, and `/api/upload-bowl-lines`.
+4. The browser sends the token in `X-Google-ID-Token` only to
+   `/api/current-admin`, `/api/upload-lines`, and `/api/upload-bowl-lines`.
+   Azure Static Web Apps managed APIs replace the standard `Authorization`
+   header with an internal proxy credential, so it cannot carry the Google
+   token on this hosting plan.
 5. The managed .NET 8 API validates Google's signature, issuer, expiry, exact
    audience, and `email_verified`, then checks the normalized email against
    `ADMIN_EMAILS`.

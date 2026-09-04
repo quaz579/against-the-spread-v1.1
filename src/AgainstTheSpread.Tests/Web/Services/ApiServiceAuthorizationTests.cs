@@ -10,7 +10,7 @@ namespace AgainstTheSpread.Tests.Web.Services;
 public class ApiServiceAuthorizationTests
 {
     [Fact]
-    public async Task ProtectedAdminCalls_AttachBearerTokenPerRequest()
+    public async Task ProtectedAdminCalls_UseSwaPreservedGoogleTokenHeaderPerRequest()
     {
         var handler = new RecordingHandler();
         var client = new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") };
@@ -33,14 +33,16 @@ public class ApiServiceAuthorizationTests
         me.Email.Should().Be("admin@example.com");
         handler.Requests.Should().HaveCount(3);
         handler.Requests.Should().OnlyContain(r =>
-            r.AuthorizationScheme == "Bearer" &&
-            r.AuthorizationParameter == "google-id-token" &&
+            r.AuthorizationScheme == null &&
+            r.AuthorizationParameter == null &&
+            r.GoogleIdToken == "google-id-token" &&
             r.NoStore);
         handler.Requests.Select(r => r.Path).Should().Equal(
             "/api/current-admin",
             "/api/upload-lines?week=1&year=2026",
             "/api/upload-bowl-lines?year=2026");
         client.DefaultRequestHeaders.Authorization.Should().BeNull();
+        client.DefaultRequestHeaders.Contains("X-Google-ID-Token").Should().BeFalse();
     }
 
     [Fact]
@@ -61,8 +63,11 @@ public class ApiServiceAuthorizationTests
         var publicRequests = handler.Requests.Skip(1).ToList();
         publicRequests.Should().HaveCount(6);
         publicRequests.Should().OnlyContain(r =>
-            r.AuthorizationScheme == null && r.AuthorizationParameter == null);
+            r.AuthorizationScheme == null &&
+            r.AuthorizationParameter == null &&
+            r.GoogleIdToken == null);
         client.DefaultRequestHeaders.Authorization.Should().BeNull();
+        client.DefaultRequestHeaders.Contains("X-Google-ID-Token").Should().BeFalse();
     }
 
     private sealed class RecordingHandler : HttpMessageHandler
@@ -77,6 +82,9 @@ public class ApiServiceAuthorizationTests
                 request.RequestUri!.PathAndQuery,
                 request.Headers.Authorization?.Scheme,
                 request.Headers.Authorization?.Parameter,
+                request.Headers.TryGetValues("X-Google-ID-Token", out var googleTokens)
+                    ? googleTokens.SingleOrDefault()
+                    : null,
                 request.Headers.CacheControl?.NoStore == true));
 
             var path = request.RequestUri.PathAndQuery;
@@ -150,5 +158,6 @@ public class ApiServiceAuthorizationTests
         string Path,
         string? AuthorizationScheme,
         string? AuthorizationParameter,
+        string? GoogleIdToken,
         bool NoStore);
 }

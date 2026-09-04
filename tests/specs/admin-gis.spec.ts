@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test('GIS credential stays in memory and authorizes only the admin API', async ({ page }) => {
+  let observedGoogleToken: string | undefined;
   let observedAuthorization: string | undefined;
 
   await page.addInitScript(() => {
@@ -28,6 +29,7 @@ test('GIS credential stays in memory and authorizes only the admin API', async (
   });
 
   await page.route('**/api/current-admin', async route => {
+    observedGoogleToken = route.request().headers()['x-google-id-token'];
     observedAuthorization = route.request().headers()['authorization'];
     await route.fulfill({
       status: 200,
@@ -42,7 +44,8 @@ test('GIS credential stays in memory and authorizes only the admin API', async (
 
   await expect(page.getByText(/Signed in as:/i)).toContainText('test-admin@example.com');
   await expect(page.locator('#weekInput')).toBeVisible();
-  expect(observedAuthorization).toBe('Bearer browser-only-test-token');
+  expect(observedGoogleToken).toBe('browser-only-test-token');
+  expect(observedAuthorization).toBeUndefined();
 
   await page.getByRole('button', { name: /Sign Out/i }).click();
   await expect(page.getByRole('button', { name: /Sign in with Google/i })).toBeVisible();

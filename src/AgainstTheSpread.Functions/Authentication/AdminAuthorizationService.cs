@@ -1,6 +1,5 @@
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Configuration;
-using System.Net.Http.Headers;
 
 namespace AgainstTheSpread.Functions.Authentication;
 
@@ -41,7 +40,7 @@ public sealed class AdminAuthorizationService : IAdminAuthorizationService
         HttpRequestData request,
         CancellationToken cancellationToken)
     {
-        if (!TryGetBearerToken(request, out var idToken))
+        if (!TryGetGoogleIdToken(request, out var idToken))
         {
             return new AdminAuthorizationResult(AdminAuthorizationStatus.Unauthorized);
         }
@@ -80,26 +79,24 @@ public sealed class AdminAuthorizationService : IAdminAuthorizationService
             identity.Email);
     }
 
-    private static bool TryGetBearerToken(HttpRequestData request, out string idToken)
+    private static bool TryGetGoogleIdToken(HttpRequestData request, out string idToken)
     {
         idToken = string.Empty;
 
-        if (!request.Headers.TryGetValues("Authorization", out var values))
+        if (!request.Headers.TryGetValues("X-Google-ID-Token", out var values))
         {
             return false;
         }
 
         var headers = values.ToArray();
         if (headers.Length != 1 ||
-            !AuthenticationHeaderValue.TryParse(headers[0], out var authorization) ||
-            !authorization.Scheme.Equals("Bearer", StringComparison.OrdinalIgnoreCase) ||
-            string.IsNullOrWhiteSpace(authorization.Parameter) ||
-            authorization.Parameter.Any(char.IsWhiteSpace))
+            string.IsNullOrWhiteSpace(headers[0]) ||
+            headers[0].Any(char.IsWhiteSpace))
         {
             return false;
         }
 
-        idToken = authorization.Parameter;
+        idToken = headers[0];
         return true;
     }
 }

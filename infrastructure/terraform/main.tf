@@ -39,6 +39,18 @@ variable "location" {
   default     = "eastus"
 }
 
+variable "google_client_id" {
+  description = "Public Google Identity Services OAuth client ID"
+  type        = string
+  default     = "1021766595648-1om4n2n0l2p6o8taqp877tf2lpdcaeeq.apps.googleusercontent.com"
+}
+
+variable "admin_emails" {
+  description = "Comma-separated Google accounts allowed to use admin APIs"
+  type        = string
+  default     = "bengrossm@gmail.com"
+}
+
 # Locals
 locals {
   resource_prefix = "${var.project_name}-${var.environment}"
@@ -98,66 +110,22 @@ resource "azurerm_application_insights" "main" {
   }
 }
 
-# App Service Plan for Azure Functions
-resource "azurerm_service_plan" "main" {
-  name                = "${local.resource_prefix}-asp"
-  location            = azurerm_resource_group.main.location
-  resource_group_name = azurerm_resource_group.main.name
-  os_type             = "Linux"
-  sku_name            = "Y1" # Consumption plan
-  tags                = local.tags
-}
-
-# Function App
-resource "azurerm_linux_function_app" "main" {
-  name                = "${local.resource_prefix}-func"
-  location            = azurerm_resource_group.main.location
-  resource_group_name = azurerm_resource_group.main.name
-  service_plan_id     = azurerm_service_plan.main.id
-
-  storage_account_name                           = azurerm_storage_account.main.name
-  storage_account_access_key                     = azurerm_storage_account.main.primary_access_key
-  https_only                                     = true
-  ftp_publish_basic_authentication_enabled       = false
-  webdeploy_publish_basic_authentication_enabled = false
-
-  site_config {
-    application_insights_connection_string = azurerm_application_insights.main.connection_string
-    application_insights_key               = azurerm_application_insights.main.instrumentation_key
-
-    application_stack {
-      dotnet_version              = "8.0"
-      use_dotnet_isolated_runtime = true
-    }
-
-    cors {
-      allowed_origins = ["https://${azurerm_static_web_app.main.default_host_name}"]
-    }
-  }
-
-  app_settings = {
-    "FUNCTIONS_WORKER_RUNTIME" = "dotnet-isolated"
-    "AzureWebJobsStorage"      = azurerm_storage_account.main.primary_connection_string
-    "WEBSITE_RUN_FROM_PACKAGE" = "1"
-  }
-
-  # Azure masks this platform-managed connection string on read, which would
-  # otherwise produce a perpetual no-op diff after every successful apply.
-  lifecycle {
-    ignore_changes = [app_settings["AzureWebJobsStorage"]]
-  }
-
-  tags = local.tags
-}
-
-# Static Web App for Blazor
+# Static Web App for Blazor and its managed Azure Functions API
 resource "azurerm_static_web_app" "main" {
   name                = "${local.resource_prefix}-web"
   location            = var.location
   resource_group_name = azurerm_resource_group.main.name
   sku_tier            = "Free"
   sku_size            = "Free"
-  tags                = local.tags
+
+  app_settings = {
+    AZURE_STORAGE_CONNECTION_STRING       = azurerm_storage_account.main.primary_connection_string
+    APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string
+    GOOGLE_CLIENT_ID                      = var.google_client_id
+    ADMIN_EMAILS                          = var.admin_emails
+  }
+
+  tags = local.tags
 }
 
 # Outputs
@@ -175,16 +143,6 @@ output "storage_connection_string" {
   value       = azurerm_storage_account.main.primary_connection_string
   description = "Storage connection string (sensitive)"
   sensitive   = true
-}
-
-output "function_app_name" {
-  value       = azurerm_linux_function_app.main.name
-  description = "Function app name"
-}
-
-output "function_app_url" {
-  value       = "https://${azurerm_linux_function_app.main.default_hostname}"
-  description = "Function app URL"
 }
 
 output "static_web_app_url" {

@@ -20,7 +20,7 @@ export default defineConfig({
   ],
 
   use: {
-    // Use SWA CLI URL (port 4280) which provides mock authentication
+    // Use the SWA CLI URL (port 4280); GIS itself is mocked by browser tests.
     baseURL: 'http://localhost:4280',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',

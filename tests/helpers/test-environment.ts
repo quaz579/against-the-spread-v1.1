@@ -3,7 +3,8 @@
  * 
  * These tests expect services to be running via SWA CLI which provides:
  * - Proxying to the web app and Azure Functions
- * - Mock authentication at /.auth/login/google
+ * - Application-owned authentication is tested with a mocked GIS callback and
+ *   fake same-origin API; no Google credential is persisted or logged
  * 
  * Start services before running tests:
  *   ./start-local.sh   # Starts Azurite, Functions, Web App
@@ -16,10 +17,10 @@
  * Test environment constants and configuration
  */
 export class TestEnvironment {
-  // Admin email for mock authentication (must match ADMIN_EMAILS env var in Functions)
+  // Admin email retained for legacy fixtures that are currently skipped.
   public readonly adminEmail = 'test-admin@example.com';
 
-  // SWA CLI URL - main entry point for tests (provides mock auth)
+  // SWA CLI URL - main entry point for tests.
   public readonly swaUrl = 'http://localhost:4280';
 
   constructor() {

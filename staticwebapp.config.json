@@ -1,34 +1,27 @@
 {
+  "platform": {
+    "apiRuntime": "dotnet-isolated:8.0"
+  },
   "routes": [
     {
-      "route": "/api/*",
-      "allowedRoles": [
-        "anonymous"
-      ]
+      "route": "/admin",
+      "headers": {
+        "Cache-Control": "no-cache, no-store, must-revalidate"
+      }
     },
     {
-      "route": "/admin/*",
-      "allowedRoles": [
-        "authenticated",
-        "administrator",
-        "anonymous"
-      ]
+      "route": "/index.html",
+      "headers": {
+        "Cache-Control": "no-cache, no-store, must-revalidate"
+      }
     }
   ],
   "navigationFallback": {
     "rewrite": "/index.html",
     "exclude": [
-      "/api/*",
-      "*.{css,scss,js,png,gif,ico,jpg,svg,woff,woff2,ttf,eot}"
+      "/images/*.{png,jpg,gif}",
+      "/css/*",
+      "/api/*"
     ]
-  },
-  "mimeTypes": {
-    ".json": "application/json",
-    ".wasm": "application/wasm"
-  },
-  "globalHeaders": {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type"
   }
 }

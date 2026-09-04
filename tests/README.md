@@ -114,11 +114,11 @@ tests/
 └── README.md                  # This file
 ```
 
-## Test Flow
+## Legacy Fixture Flow
 
-Each test follows this flow:
+The skipped fixture-upload suites follow this flow:
 
-1. **Login** to admin page using SWA CLI mock authentication
+1. **Authenticate** as an admin (a replacement harness is still required)
 2. **Upload lines** Excel file via the admin UI
 3. **Navigate** to the picks page
 4. **Enter** user name
@@ -129,15 +129,16 @@ Each test follows this flow:
 
 ## How Authentication Works
 
-The tests use SWA CLI's mock authentication feature:
+The active browser authentication test injects a fake GIS callback before
+Blazor loads and intercepts `/api/admin/me`. It verifies that the credential is
+sent only as a Bearer token on the protected API request, is not persisted in
+browser storage, and is cleared on sign-out. Server-side token validation and
+upload authorization are covered by .NET unit tests.
 
-1. **SWA CLI** proxies requests and provides mock auth at `/.auth/login/google`
-2. **Mock auth page** allows entering any email (tests use `test-admin@example.com`)
-3. **SWA CLI** creates an auth cookie and injects `X-MS-CLIENT-PRINCIPAL` header
-4. **Azure Functions** read the header to authenticate/authorize requests
-5. **CookieHandler** in Blazor ensures cookies are sent with API requests
-
-The admin email `test-admin@example.com` is configured in `local.settings.json` as an allowed admin.
+The older fixture-upload flows are skipped because they depended on SWA mock
+principals, which this security boundary deliberately rejects. Re-enable them
+only after adding storage seeding that does not bypass production
+authorization.
 
 ## Configuration
 
@@ -183,11 +184,12 @@ Stop any conflicting processes:
 ./stop-local.sh
 ```
 
-### Authentication fails (403 errors)
+### Authentication fails
 
-- Verify SWA CLI is running on port 4280
-- Check that `test-admin@example.com` is in `ADMIN_EMAILS` in `local.settings.json`
-- Ensure the Blazor app is configured to use port 4280 (`appsettings.Development.json`)
+- Verify `GOOGLE_CLIENT_ID` matches the Web OAuth client configured in the
+  frontend.
+- Verify the browser origin is an authorized JavaScript origin in Google Cloud.
+- Verify the signed-in verified email is in `ADMIN_EMAILS`.
 
 ### Tests timeout
 

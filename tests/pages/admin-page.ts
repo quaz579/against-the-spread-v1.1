@@ -13,9 +13,6 @@ export class AdminPage {
     readonly signedInAlert: Locator;
     readonly accessDeniedAlert: Locator;
 
-    // Mock auth form elements (SWA CLI mock auth page)
-    readonly mockAuthUsernameInput: Locator;
-    readonly mockAuthSubmitButton: Locator;
 
     // Upload form elements (weekly lines)
     readonly weekInput: Locator;
@@ -49,10 +46,6 @@ export class AdminPage {
         this.signedInAlert = page.locator('.alert-info').filter({ hasText: 'Signed in as' });
         this.accessDeniedAlert = page.locator('.alert-warning').filter({ hasText: 'Access Denied' });
 
-        // Mock auth form elements (SWA CLI provides these)
-        // The SWA CLI mock auth page has a 'userDetails' field labeled as 'Username' - this is where email goes
-        this.mockAuthUsernameInput = page.locator('input[name="userDetails"]');
-        this.mockAuthSubmitButton = page.getByRole('button', { name: 'Login' });
 
         // Upload form elements (weekly lines)
         this.weekInput = page.locator('#weekInput');
@@ -103,34 +96,12 @@ export class AdminPage {
     }
 
     /**
-     * Login using SWA CLI mock authentication
-     * @param email - Email to use for mock auth (should match ADMIN_EMAILS)
+     * SWA mock authentication cannot represent application-owned GIS tokens.
+     * Unit tests use a fake same-origin API; browser tests must not require a
+     * real Google sign-in or handle a Google credential.
      */
-    async loginWithMockAuth(email: string): Promise<void> {
-        // Click the login button which redirects to /.auth/login/google
-        await this.loginButton.click();
-
-        // Wait for the mock auth page to load
-        await this.page.waitForURL('**/.auth/login/google**', { timeout: 10000 });
-
-        // SWA CLI mock auth page has multiple fields
-        // Fill in the userDetails field (labeled "Username") with the email
-        const userDetailsInput = this.page.locator('input[name="userDetails"]');
-        await userDetailsInput.waitFor({ state: 'visible', timeout: 10000 });
-        await userDetailsInput.fill(email);
-
-        // Trigger the keyup event to save to localStorage (SWA CLI uses this)
-        await userDetailsInput.dispatchEvent('keyup');
-
-        // Small delay to let localStorage save
-        await this.page.waitForTimeout(100);
-
-        // Submit the mock auth form
-        await this.mockAuthSubmitButton.click();
-
-        // Wait for redirect back to admin page
-        await this.page.waitForURL('**/admin**', { timeout: 10000 });
-        await this.page.waitForLoadState('networkidle');
+    async loginWithMockAuth(_email: string): Promise<void> {
+        throw new Error('SWA mock authentication is not supported by the GIS admin flow.');
     }
 
     /**
@@ -145,18 +116,6 @@ export class AdminPage {
             throw new Error('Not authenticated. Call loginWithMockAuth first.');
         }
 
-        // Set up network logging to debug auth issues
-        this.page.on('request', request => {
-            if (request.url().includes('/api/')) {
-                console.log(`API Request: ${request.method()} ${request.url()}`);
-                console.log(`Headers: ${JSON.stringify(request.headers())}`);
-            }
-        });
-        this.page.on('response', response => {
-            if (response.url().includes('/api/')) {
-                console.log(`API Response: ${response.status()} ${response.url()}`);
-            }
-        });
 
         // Fill in week number
         await this.weekInput.fill(week.toString());
@@ -223,17 +182,6 @@ export class AdminPage {
             throw new Error('Not authenticated. Call loginWithMockAuth first.');
         }
 
-        // Set up network logging to debug auth issues
-        this.page.on('request', request => {
-            if (request.url().includes('/api/')) {
-                console.log(`API Request: ${request.method()} ${request.url()}`);
-            }
-        });
-        this.page.on('response', response => {
-            if (response.url().includes('/api/')) {
-                console.log(`API Response: ${response.status()} ${response.url()}`);
-            }
-        });
 
         // Fill in year for bowl lines
         await this.bowlYearInput.fill(year.toString());

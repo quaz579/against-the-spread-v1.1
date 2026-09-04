@@ -1,51 +1,41 @@
-# Local Development with Authentication
+# Local Authentication Development
 
-## Quick Start (Recommended - Mock Auth)
+The v1.1 admin flow uses application-owned Google Identity Services tokens. SWA CLI mock principals are intentionally unsupported because the Functions no longer trust `X-MS-CLIENT-PRINCIPAL`.
 
-The SWA CLI supports mock authentication for local testing without needing real OAuth:
+## Automated local testing
+
+No localhost Google origin is required for the normal test suite:
+
+- Function authorization tests inject a fake token validator.
+- Blazor component tests mock JavaScript interop and the same-origin admin API.
+- `tests/specs/admin-gis.spec.ts` injects a fake GIS browser object and intercepts `/api/admin/me`.
+
+The browser test credential is synthetic, never leaves localhost, and cannot authenticate to production.
+
+Run the .NET tests:
 
 ```bash
-# Start the local SWA emulator with mock auth
-swa start http://localhost:5158 --api-location http://localhost:7071 --app-artifact-location src/AgainstTheSpread.Web/bin/Debug/net8.0/wwwroot
-
-# In separate terminals:
-# Terminal 1: Start Blazor app
-cd src/AgainstTheSpread.Web && dotnet watch run
-
-# Terminal 2: Start Functions
-cd src/AgainstTheSpread.Functions && func start
+dotnet test AgainstTheSpread.sln
 ```
 
-Then access: `http://localhost:4280` (SWA CLI default port)
+Run TypeScript validation and Playwright after starting the local app/SWA environment:
 
-To login with mock auth, visit: `http://localhost:4280/.auth/login/google`
+```bash
+cd tests
+npm exec -- tsc -p tsconfig.json --noEmit
+npm test
+```
 
-You'll see a mock login page where you can enter any email (use `bengrossm@gmail.com` to match your ADMIN_EMAILS).
+Five legacy upload E2E fixtures are skipped because they depended on SWA CLI's forged principal. Their backend authorization and upload entry paths are covered by .NET tests; final upload verification uses a real allowlisted Google account on the deployed origin.
 
-## Alternative: Real Google OAuth Locally
+## Optional real GIS testing on localhost
 
-If you want to test with real Google OAuth:
+Only add localhost under **Authorized JavaScript origins** if a developer specifically needs to exercise Google's real widget locally. Google documents adding both `http://localhost` and the exact port origin, such as `http://localhost:4280`.
 
-1. Add localhost redirect URI in Google Console:
-   ```
-   http://localhost:4280/.auth/login/google/callback
-   ```
+A redirect URI and client secret are not needed for the GIS JavaScript-callback flow.
 
-2. Create a `.env` file in the project root:
-   ```
-   GOOGLE_CLIENT_ID=520517828773-09fud86es46rrj48bosc2g5de1ubk46i.apps.googleusercontent.com
-   GOOGLE_CLIENT_SECRET=<redacted>>
-   ADMIN_EMAILS=<redacted>
-   ```
+Production verification must still run on:
 
-3. Start SWA CLI and load environment variables:
-   ```bash
-   swa start --env-file .env
-   ```
-
-## Simpler Testing
-
-The deployment to dev takes ~2-3 minutes. Since you've already set up the Google OAuth properly, waiting for the dev deployment is actually faster than setting up local OAuth testing.
-
-You can monitor the deployment at:
-https://github.com/quaz579/against-the-spread/actions
+```text
+https://white-river-02b2c0110.3.azurestaticapps.net
+```

@@ -1,51 +1,49 @@
 using AgainstTheSpread.Core.Interfaces;
+using AgainstTheSpread.Functions.Authentication;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using System.Net;
-using System.Text;
-using System.Text.Json;
 
 namespace AgainstTheSpread.Functions;
 
 /// <summary>
-/// Azure Function for uploading weekly game lines
+/// Azure Function for uploading weekly game lines.
 /// </summary>
 public class UploadLinesFunction
 {
     private readonly ILogger<UploadLinesFunction> _logger;
     private readonly IExcelService _excelService;
     private readonly IStorageService _storageService;
+    private readonly IAdminAuthorizationService _authorizationService;
 
     public UploadLinesFunction(
         ILogger<UploadLinesFunction> logger,
         IExcelService excelService,
-        IStorageService storageService)
+        IStorageService storageService,
+        IAdminAuthorizationService authorizationService)
     {
         _logger = logger;
         _excelService = excelService;
         _storageService = storageService;
+        _authorizationService = authorizationService;
     }
 
-    /// <summary>
-    /// Upload weekly lines file
-    /// POST /api/upload-lines
-    /// </summary>
     [Function("UploadLines")]
     public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "upload-lines")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "upload-lines")] HttpRequestData req,
+        CancellationToken cancellationToken)
     {
+        var authorization = await _authorizationService.AuthorizeAsync(req, cancellationToken);
+        if (authorization.Status != AdminAuthorizationStatus.Authorized)
+        {
+            return await AdminAuthorizationResponses.CreateDeniedAsync(req, authorization.Status);
+        }
+
         _logger.LogInformation("Processing upload request");
 
         try
         {
-            // Check authentication and authorization
-            if (!IsAuthorized(req, out var errorResponse))
-            {
-                return errorResponse;
-            }
-
-            // Get week and year from query parameters
             if (!int.TryParse(req.Query["week"], out int week))
             {
                 var badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
@@ -60,9 +58,8 @@ public class UploadLinesFunction
                 return badResponse;
             }
 
-            // Read the file from request body (expecting raw file upload)
             using var stream = new MemoryStream();
-            await req.Body.CopyToAsync(stream);
+            await req.Body.CopyToAsync(stream, cancellationToken);
             stream.Position = 0;
 
             if (stream.Length == 0)
@@ -72,10 +69,12 @@ public class UploadLinesFunction
                 return badResponse;
             }
 
-            _logger.LogInformation("Uploading week {Week} for year {Year}, file size: {Size} bytes",
-                week, year, stream.Length);
+            _logger.LogInformation(
+                "Uploading week {Week} for year {Year}, file size: {Size} bytes",
+                week,
+                year,
+                stream.Length);
 
-            // Read and validate the Excel file
             var weeklyLines = await _excelService.ParseWeeklyLinesAsync(stream, week, year);
 
             if (weeklyLines.Games.Count == 0)
@@ -85,19 +84,20 @@ public class UploadLinesFunction
                 return badResponse;
             }
 
-            // Upload to blob storage
-            stream.Position = 0; // Reset stream
+            stream.Position = 0;
             await _storageService.UploadWeeklyLinesAsync(stream, week, year);
 
-            _logger.LogInformation("Successfully uploaded {Count} games for week {Week}",
-                weeklyLines.Games.Count, week);
+            _logger.LogInformation(
+                "Successfully uploaded {Count} games for week {Week}",
+                weeklyLines.Games.Count,
+                week);
 
             var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(new
             {
                 success = true,
-                week = week,
-                year = year,
+                week,
+                year,
                 gamesCount = weeklyLines.Games.Count,
                 message = $"Successfully uploaded {weeklyLines.Games.Count} games for Week {week}"
             });
@@ -111,125 +111,4 @@ public class UploadLinesFunction
             return errorResponse;
         }
     }
-
-    /// <summary>
-    /// Check if the request is from an authorized admin user
-    /// </summary>
-    private bool IsAuthorized(HttpRequestData req, out HttpResponseData errorResponse)
-    {
-        errorResponse = null!;
-
-        // Get the client principal from SWA auth header
-        if (!req.Headers.TryGetValues("X-MS-CLIENT-PRINCIPAL", out var principalValues))
-        {
-            _logger.LogWarning("No authentication header found");
-            errorResponse = req.CreateResponse(HttpStatusCode.Unauthorized);
-            errorResponse.WriteStringAsync("Authentication required").Wait();
-            return false;
-        }
-
-        var principalHeader = principalValues.FirstOrDefault();
-        if (string.IsNullOrEmpty(principalHeader))
-        {
-            _logger.LogWarning("Empty authentication header");
-            errorResponse = req.CreateResponse(HttpStatusCode.Unauthorized);
-            errorResponse.WriteStringAsync("Authentication required").Wait();
-            return false;
-        }
-
-        try
-        {
-            // Decode the base64-encoded principal
-            var principalJson = Encoding.UTF8.GetString(Convert.FromBase64String(principalHeader));
-            var principal = JsonSerializer.Deserialize<ClientPrincipal>(principalJson, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            });
-
-            if (principal == null || string.IsNullOrEmpty(principal.UserId))
-            {
-                _logger.LogWarning("Invalid principal data");
-                errorResponse = req.CreateResponse(HttpStatusCode.Unauthorized);
-                errorResponse.WriteStringAsync("Invalid authentication").Wait();
-                return false;
-            }
-
-            // Get admin email list from environment variable
-            var adminEmailsConfig = Environment.GetEnvironmentVariable("ADMIN_EMAILS") ?? "";
-            var adminEmails = adminEmailsConfig
-                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Select(e => e.ToLowerInvariant())
-                .ToHashSet();
-
-            // Get user email from claims
-            var userEmail = principal.Claims
-                ?.FirstOrDefault(c => c.Type?.Equals("email", StringComparison.OrdinalIgnoreCase) == true)
-                ?.Value;
-
-            if (string.IsNullOrEmpty(userEmail))
-            {
-                // Try alternative claim types
-                userEmail = principal.Claims
-                    ?.FirstOrDefault(c => c.Type?.Equals("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress", StringComparison.OrdinalIgnoreCase) == true)
-                    ?.Value;
-            }
-
-            if (string.IsNullOrEmpty(userEmail))
-            {
-                // Try UserDetails property - Google OAuth in SWA often stores email here
-                userEmail = principal.UserDetails;
-                _logger.LogInformation("Email retrieved from UserDetails for user {UserId}", principal.UserId);
-            }
-
-            if (string.IsNullOrEmpty(userEmail))
-            {
-                _logger.LogWarning("No email found in claims or UserDetails for user {UserId}. Claims: {Claims}", 
-                    principal.UserId, 
-                    principal.Claims?.Select(c => $"{c.Type}={c.Value}").ToList() ?? new List<string>());
-                errorResponse = req.CreateResponse(HttpStatusCode.Forbidden);
-                errorResponse.WriteStringAsync("Email not found in authentication").Wait();
-                return false;
-            }
-
-            // Check if user email is in admin list
-            if (!adminEmails.Contains(userEmail.ToLowerInvariant()))
-            {
-                _logger.LogWarning("User {Email} is not authorized as admin", userEmail);
-                errorResponse = req.CreateResponse(HttpStatusCode.Forbidden);
-                errorResponse.WriteStringAsync("Access denied. Admin privileges required.").Wait();
-                return false;
-            }
-
-            _logger.LogInformation("Admin access granted for {Email}", userEmail);
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error validating authentication");
-            errorResponse = req.CreateResponse(HttpStatusCode.Unauthorized);
-            errorResponse.WriteStringAsync("Authentication validation failed").Wait();
-            return false;
-        }
-    }
-}
-
-/// <summary>
-/// Represents the client principal from SWA authentication
-/// </summary>
-internal class ClientPrincipal
-{
-    public string? IdentityProvider { get; set; }
-    public string? UserId { get; set; }
-    public string? UserDetails { get; set; }
-    public List<string>? UserRoles { get; set; }
-    public List<ClientPrincipalClaim>? Claims { get; set; }
-}
-
-/// <summary>
-/// Represents a claim in the client principal
-/// </summary>
-internal class ClientPrincipalClaim
-{
-    public string? Type { get; set; }
-    public string? Value { get; set; }
 }

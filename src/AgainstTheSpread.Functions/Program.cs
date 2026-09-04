@@ -1,5 +1,6 @@
 using AgainstTheSpread.Core.Interfaces;
 using AgainstTheSpread.Core.Services;
+using AgainstTheSpread.Functions.Authentication;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -14,6 +15,8 @@ var host = new HostBuilder()
         // Register application services
         services.AddSingleton<IExcelService, ExcelService>();
         services.AddSingleton<IBowlExcelService, BowlExcelService>();
+        services.AddSingleton<IGoogleIdTokenValidator, GoogleIdTokenValidator>();
+        services.AddSingleton<IAdminAuthorizationService, AdminAuthorizationService>();
         services.AddSingleton<IStorageService>(sp =>
         {
             // Use AZURE_STORAGE_CONNECTION_STRING for custom storage, fallback to AzureWebJobsStorage for local dev

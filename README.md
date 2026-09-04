@@ -81,19 +81,18 @@ If you prefer to install tools manually:
    cd against-the-spread-v1.1
    ```
 
-2. **Create .env file** (for local development)
+2. **Create local Functions settings**
    ```bash
-   # Create .env in the root directory with:
-   GOOGLE_CLIENT_ID=your-google-client-id
-   GOOGLE_CLIENT_SECRET=your-google-client-secret
-   ADMIN_EMAILS=your-admin-email@example.com
+   cp src/AgainstTheSpread.Functions/local.settings.example.json \
+      src/AgainstTheSpread.Functions/local.settings.json
    ```
+   Set `GOOGLE_CLIENT_ID`, `ADMIN_EMAILS`, and the local storage connection.
+   This flow has no Google client secret.
 
 3. **Configure Google OAuth** (see `GOOGLE_AUTH_SETUP.md` for detailed instructions)
    - Create OAuth 2.0 Client in Google Cloud Console
-   - Add redirect URIs:
-     - `https://your-swa-hostname.azurestaticapps.net/.auth/login/google/callback` (production)
-     - `http://localhost:4280/.auth/login/google/callback` (local dev)
+   - Add authorized JavaScript origins for the production host and
+     `http://localhost:4280`
 
 4. **Configure Azure resources**
    ```bash
@@ -124,23 +123,21 @@ If you prefer to install tools manually:
      --name swa-against-the-spread \
      --setting-names \
        GOOGLE_CLIENT_ID="your-client-id" \
-       GOOGLE_CLIENT_SECRET="your-client-secret" \
        ADMIN_EMAILS="admin@example.com" \
        AZURE_STORAGE_CONNECTION_STRING="your-connection-string"
    ```
 
 ### Local Development
 
-Run the app locally with authentication emulation:
+Run the app locally with Google Identity Services:
 
 1. **Publish the Blazor app** (generates static files)
    ```bash
    dotnet publish src/AgainstTheSpread.Web -c Debug
    ```
 
-2. **Load environment variables and start SWA CLI**
+2. **Start SWA CLI**
    ```bash
-   export $(cat .env | xargs)
    swa start src/AgainstTheSpread.Web/bin/Debug/net8.0/publish/wwwroot \
      --api-location src/AgainstTheSpread.Functions
    ```
@@ -151,8 +148,10 @@ Run the app locally with authentication emulation:
    - Functions (direct): `http://localhost:7071/api`
 
 4. **Test authentication locally**
-   - SWA CLI provides mock authentication at `http://localhost:4280/.auth/login/google`
-   - For real Google OAuth testing, ensure redirect URI includes `http://localhost:4280/.auth/login/google/callback` in Google Console
+   - Use a real Google sign-in only when `http://localhost:4280` is an
+     authorized JavaScript origin.
+   - Automated tests inject a fake GIS callback and intercept admin APIs;
+     they do not mint real Google credentials or use SWA mock principals.
 
 **Note**: The Blazor app must be published (not just built) for the SWA CLI to serve it correctly. The publish step generates the static files in `bin/Debug/net8.0/publish/wwwroot/`.
 

@@ -1,88 +1,50 @@
-# Google Authentication Setup for Admin Access
+# Google Identity Services Admin Authentication
 
-This guide explains how to configure Google authentication for the admin panel.
+The v1.1 admin page uses Google Identity Services (GIS) on the Azure Static Web Apps Free plan. The browser receives a short-lived signed Google ID token and sends it only to the protected same-origin APIs. The Functions validate the token and enforce the admin allowlist.
 
-## Step 1: Create Google OAuth App
+## Google Cloud configuration
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com)
-2. Create a new project (or select existing)
-3. Enable the **Google+ API**:
-   - Go to "APIs & Services" > "Library"
-   - Search for "Google+ API"
-   - Click "Enable"
+Use the existing Web application OAuth client.
 
-4. Create OAuth 2.0 credentials:
-   - Go to "APIs & Services" > "Credentials"
-   - Click "Create Credentials" > "OAuth client ID"
-   - Application type: "Web application"
-   - Name: "Against The Spread Admin"
-   
-5. Add authorized redirect URIs:
-   - For dev: `https://dev-<random-id>-<your-swa-name>.azurestaticapps.net/.auth/login/google/callback`
-   - For production: `https://<your-swa-name>.azurestaticapps.net/.auth/login/google/callback`
-   
-   **Note:** Get your exact SWA URL from the Azure portal or GitHub Actions deployment logs
+Under **Authorized JavaScript origins**, retain the v1 origin and add:
 
-6. Click "Create" and save your:
-   - **Client ID** (looks like: `123456789-abc123.apps.googleusercontent.com`)
-   - **Client Secret** (looks like: `GOCSPX-abc123xyz...`)
-
-## Step 2: Configure Azure Static Web App
-
-Add these application settings to your SWA (both dev and production):
-
-```bash
-# Using Azure CLI
-az staticwebapp appsettings set \
-  --name <your-swa-name> \
-  --resource-group <your-resource-group> \
-  --setting-names \
-    GOOGLE_CLIENT_ID="<your-client-id>" \
-    GOOGLE_CLIENT_SECRET="<your-client-secret>" \
-    ADMIN_EMAILS="your-email@gmail.com,other-admin@gmail.com"
+```text
+https://white-river-02b2c0110.3.azurestaticapps.net
 ```
 
-Or via Azure Portal:
-1. Go to your Static Web App
-2. Click "Configuration" under Settings
-3. Add Application settings:
-   - `GOOGLE_CLIENT_ID`: Your Google OAuth Client ID
-   - `GOOGLE_CLIENT_SECRET`: Your Google OAuth Client Secret
-   - `ADMIN_EMAILS`: Comma-separated list of authorized admin emails
+Do not add a redirect URI for this JavaScript-callback flow. Do not remove the existing v1 callback configuration.
 
-## Step 3: Test the Setup
+The OAuth client ID is public and is present in the frontend configuration. The Google client secret is not used and must not be added to the repository, browser configuration, or Azure settings.
 
-1. Deploy to dev branch and wait for deployment
-2. Navigate to `/admin` on your dev URL
-3. Click "Sign in with Google"
-4. After signing in, you should see the upload interface
-5. If your email is not in `ADMIN_EMAILS`, you'll see an access denied message
+If the consent screen is in Testing mode, keep the intended admin Google account in the test-user list.
 
-## Step 4: Production Deployment
+## Azure configuration
 
-Once tested on dev:
-1. Merge dev to main
-2. Update Google OAuth redirect URIs to include production URL
-3. Ensure production SWA has the same app settings configured
+Terraform configures these managed-API application settings on `ats-v11-prod-web`:
 
-## Troubleshooting
+- `GOOGLE_CLIENT_ID`: exact expected Google token audience.
+- `ADMIN_EMAILS`: comma-separated allowlist of verified Google email addresses.
+- `AZURE_STORAGE_CONNECTION_STRING`: private game-file storage.
+- `APPLICATIONINSIGHTS_CONNECTION_STRING`: telemetry.
 
-### "Authentication required" error
-- Check that `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set in SWA app settings
-- Verify redirect URI in Google Console matches your SWA URL exactly
+Apply settings through `infrastructure/terraform/main.tf`; do not configure SWA custom authentication. The Free plan does not support the old custom `auth` block.
 
-### "Access denied" error
-- Check that your email is in the `ADMIN_EMAILS` setting
-- Ensure there are no extra spaces in the email list
-- Emails are case-insensitive
+## Authorization behavior
 
-### Upload still fails
-- Check Azure Functions logs for detailed error messages
-- Verify storage connection string is still configured
+- Missing, malformed, expired, wrongly signed, or wrong-audience credentials return `401`.
+- Tokens without a verified, non-empty email return `401`.
+- A valid Google identity not present in `ADMIN_EMAILS` returns `403`.
+- `/api/admin/me`, `/api/upload-lines`, and `/api/upload-bowl-lines` require the bearer token.
+- Public picks and lines APIs remain anonymous.
+- `X-MS-CLIENT-PRINCIPAL` is not trusted.
 
-## Security Notes
+## Verification
 
-- Google OAuth is free and secure
-- Only emails in `ADMIN_EMAILS` can upload files
-- All other endpoints remain public (read-only)
-- Frontend shows login UI, but backend enforces authorization
+1. Open `/admin` on the deployed v1.1 origin.
+2. Confirm the rendered Google button reaches Google's account chooser.
+3. Sign in with an allowlisted account.
+4. Confirm the admin page displays the server-verified email.
+5. Exercise both upload forms.
+6. Sign out and confirm the credential is discarded and the upload UI disappears.
+
+Never put Google credentials in logs, URLs, screenshots, `localStorage`, or `sessionStorage`.

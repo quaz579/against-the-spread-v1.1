@@ -40,18 +40,17 @@ async function onActivate(event) {
 async function onFetch(event) {
     let cachedResponse = null;
     if (event.request.method === 'GET') {
-        // Skip caching for authentication and API endpoints
+        // Keep API and admin requests out of the offline cache.
         const url = new URL(event.request.url);
-        if (url.pathname.startsWith('/.auth/') ||
-            url.pathname.startsWith('/api/') ||
+        if (url.pathname.startsWith('/api/') ||
             url.pathname === '/admin' ||
             url.pathname === '/index.html') {
-            // Network-first for auth, API, and admin pages
+            // Network-first for API and admin pages.
             try {
                 return await fetch(event.request);
             } catch (error) {
-                // Only fall back to cache for static assets, not auth/API
-                if (!url.pathname.startsWith('/.auth/') && !url.pathname.startsWith('/api/')) {
+                // API responses must never fall back to cached data.
+                if (!url.pathname.startsWith('/api/')) {
                     const cache = await caches.open(cacheName);
                     cachedResponse = await cache.match(event.request);
                     if (cachedResponse) {

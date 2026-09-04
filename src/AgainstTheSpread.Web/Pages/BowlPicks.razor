@@ -201,19 +201,36 @@
         {
             <div class="fixed-bottom bg-white border-top p-3 shadow">
                 <div class="container">
-                    <div class="d-grid gap-2">
-                        <button class="btn btn-success btn-lg" @onclick="GenerateBowlPicks" disabled="@isDownloading">
-                            @if (isDownloading)
-                            {
-                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                                <span>Generating Excel...</span>
-                            }
-                            else
-                            {
-                                <span>📥 Generate Bowl Picks Excel</span>
-                            }
-                        </button>
-                    </div>
+                    @if (generatedExcelBytes == null)
+                    {
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-success btn-lg" @onclick="GenerateBowlPicks" disabled="@isDownloading">
+                                @if (isDownloading)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                    <span>Generating Excel...</span>
+                                }
+                                else
+                                {
+                                    <span>📥 Generate Bowl Picks Excel</span>
+                                }
+                            </button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-success mb-2" role="status">
+                            Your bowl picks file is ready.
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-success btn-lg" @onclick="DownloadGeneratedBowlPicks">
+                                📥 Download File
+                            </button>
+                            <small class="text-muted text-center">
+                                On iPhone, choose Save to Files from the share sheet.
+                            </small>
+                        </div>
+                    }
                 </div>
             </div>
         }
@@ -228,6 +245,9 @@
     private bool isLoading = false;
     private bool isDownloading = false;
     private string? errorMessage = null;
+    private byte[]? generatedExcelBytes = null;
+    private string? generatedFileName = null;
+    private long bowlPicksRevision = 0;
 
     protected override async Task OnInitializedAsync()
     {
@@ -281,6 +301,8 @@
     {
         bowlLines = null;
         picks.Clear();
+        generatedExcelBytes = null;
+        generatedFileName = null;
     }
 
     private BowlPick GetOrCreatePick(int gameNumber)
@@ -294,12 +316,22 @@
 
     private void SetSpreadPick(int gameNumber, string team)
     {
-        GetOrCreatePick(gameNumber).SpreadPick = team;
+        var pick = GetOrCreatePick(gameNumber);
+        if (pick.SpreadPick != team)
+        {
+            pick.SpreadPick = team;
+            InvalidateGeneratedWorkbook();
+        }
     }
 
     private void SetConfidence(int gameNumber, int confidence)
     {
-        GetOrCreatePick(gameNumber).ConfidencePoints = confidence;
+        var pick = GetOrCreatePick(gameNumber);
+        if (pick.ConfidencePoints != confidence)
+        {
+            pick.ConfidencePoints = confidence;
+            InvalidateGeneratedWorkbook();
+        }
     }
 
     private void HandleConfidenceChange(int gameNumber, ChangeEventArgs e)
@@ -312,7 +344,19 @@
 
     private void SetOutrightWinner(int gameNumber, string team)
     {
-        GetOrCreatePick(gameNumber).OutrightWinner = team;
+        var pick = GetOrCreatePick(gameNumber);
+        if (pick.OutrightWinner != team)
+        {
+            pick.OutrightWinner = team;
+            InvalidateGeneratedWorkbook();
+        }
+    }
+
+    private void InvalidateGeneratedWorkbook()
+    {
+        bowlPicksRevision++;
+        generatedExcelBytes = null;
+        generatedFileName = null;
     }
 
     private bool IsConfidencePointUsed(int confidence, int excludeGameNumber)
@@ -375,17 +419,16 @@
                 SubmittedAt = DateTime.UtcNow
             };
 
+            var submittedRevision = bowlPicksRevision;
             var excelBytes = await ApiService.SubmitBowlPicksAsync(userPicks);
 
             if (excelBytes != null)
             {
-                // Download file using JavaScript interop
-                var fileName = $"{SanitizeFileName(userName)}_Bowl_Picks_{selectedYear}.xlsx";
-                await JSRuntime.InvokeVoidAsync("downloadFile", fileName, Convert.ToBase64String(excelBytes));
-
-                // Show success message and reset
-                await JSRuntime.InvokeVoidAsync("alert", "✅ Your bowl picks have been downloaded successfully!");
-                GoBack();
+                if (submittedRevision == bowlPicksRevision)
+                {
+                    generatedExcelBytes = excelBytes;
+                    generatedFileName = $"{SanitizeFileName(userName)}_Bowl_Picks_{selectedYear}.xlsx";
+                }
             }
             else
             {
@@ -399,6 +442,17 @@
         finally
         {
             isDownloading = false;
+        }
+    }
+
+    private async Task DownloadGeneratedBowlPicks()
+    {
+        if (generatedExcelBytes != null && generatedFileName != null)
+        {
+            await JSRuntime.InvokeVoidAsync(
+                "downloadFile",
+                generatedFileName,
+                Convert.ToBase64String(generatedExcelBytes));
         }
     }
 

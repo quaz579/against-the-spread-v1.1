@@ -71,8 +71,29 @@
 
     <!-- File download helper -->
     <script>
-        window.downloadFile = function (fileName, base64Content) {
-            const linkSource = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + base64Content;
+        window.downloadFile = async function (fileName, base64Content) {
+            const mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+            const binary = atob(base64Content);
+            const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
+            const file = new File([bytes], fileName, { type: mimeType });
+
+            // Installed iOS PWAs do not reliably honor programmatic data-URL
+            // downloads. Use the native share sheet so Save to Files is available.
+            if (navigator.standalone === true &&
+                typeof navigator.share === 'function' &&
+                typeof navigator.canShare === 'function' &&
+                navigator.canShare({ files: [file] })) {
+                try {
+                    await navigator.share({ files: [file], title: fileName });
+                    return;
+                } catch (error) {
+                    if (error?.name === 'AbortError') {
+                        return;
+                    }
+                }
+            }
+
+            const linkSource = 'data:' + mimeType + ';base64,' + base64Content;
             const downloadLink = document.createElement('a');
             downloadLink.href = linkSource;
             downloadLink.download = fileName;

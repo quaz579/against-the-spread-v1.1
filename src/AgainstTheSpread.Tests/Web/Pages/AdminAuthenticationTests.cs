@@ -11,7 +11,7 @@ namespace AgainstTheSpread.Tests.Web.Pages;
 public class AdminAuthenticationTests : TestContext
 {
     private const string ClientId =
-        "1021766595648-1om4n2n0l2p6o8taqp877tf2lpdcaeeq.apps.googleusercontent.com";
+        "520517828773-09fud86es46rrj48bosc2g5de1ubk46i.apps.googleusercontent.com";
 
     public AdminAuthenticationTests()
     {

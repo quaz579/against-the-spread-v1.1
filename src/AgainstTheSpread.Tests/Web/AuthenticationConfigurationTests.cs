@@ -6,7 +6,7 @@ namespace AgainstTheSpread.Tests.Web;
 public class AuthenticationConfigurationTests
 {
     private const string GoogleClientId =
-        "1021766595648-1om4n2n0l2p6o8taqp877tf2lpdcaeeq.apps.googleusercontent.com";
+        "520517828773-09fud86es46rrj48bosc2g5de1ubk46i.apps.googleusercontent.com";
 
     [Fact]
     public void StaticWebAppConfig_RemovesSwaAuthButPreservesRuntimeAndPublicApiFallback()
@@ -67,6 +67,11 @@ public class AuthenticationConfigurationTests
             "AgainstTheSpread.Web",
             "wwwroot",
             "service-worker.published.js"));
+        var terraform = File.ReadAllText(Path.Combine(
+            root,
+            "infrastructure",
+            "terraform",
+            "main.tf"));
 
         adminSource.Should().NotContain("/.auth/");
         serviceWorker.Should().NotContain("/.auth/");
@@ -79,6 +84,7 @@ public class AuthenticationConfigurationTests
         gisSource.Should().Contain("disableAutoSelect");
         gisSource.Should().NotContain(".prompt(");
         appSettings.Should().Contain(GoogleClientId);
+        terraform.Should().Contain(GoogleClientId);
     }
 
     [Fact]

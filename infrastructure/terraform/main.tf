@@ -42,7 +42,7 @@ variable "location" {
 variable "google_client_id" {
   description = "Public Google Identity Services OAuth client ID"
   type        = string
-  default     = "1021766595648-1om4n2n0l2p6o8taqp877tf2lpdcaeeq.apps.googleusercontent.com"
+  default     = "520517828773-09fud86es46rrj48bosc2g5de1ubk46i.apps.googleusercontent.com"
 }
 
 variable "admin_emails" {
